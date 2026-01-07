@@ -1,0 +1,112 @@
+You are building a modern incremental / idle web game called “DaoVerse — Infinite Cultivation”.
+
+Goal: Create a fully playable browser game where numbers constantly grow, players unlock new systems over time, and progression feels endless. The theme is Xianxia cultivation.
+
+STACK REQUIREMENTS
+- Frontend: React + TypeScript + Tailwind
+- State: localStorage + in-memory state
+- No backend for now (offline playable)
+- Modular code, comments, clean structure
+
+GAME FLOW
+1. New player signs up (local only)
+   - choose username
+   - choose gender
+   - choose Faction: Demonic / Righteous / Heavenly
+   Each faction gives a different starting buff:
+   - Demonic: +10% click Qi
+   - Righteous: +10% passive Qi
+   - Heavenly: -10% Realm costs
+
+2. Main screen shows:
+   - Big round button: “Gain Qi”
+   - Current Qi
+   - Qi per second
+   - Current Realm
+   - Small notifications panel
+
+3. Clicking “Gain Qi” increases Qi.
+Base value = 1 Qi, multiplied by:
+   realmMultiplier * itemUpgrades * factionBonus * globalBonuses
+
+PASSIVE GENERATORS
+Create purchasable generators that produce Qi automatically.
+Examples (editable):
+
+Meditation Mat — cost 10 Qi — +0.5 Qi/sec  
+Spirit Well — cost 200 Qi — +3 Qi/sec  
+Inner Disciple — cost 5000 Qi — +20 Qi/sec  
+Qi Formation — cost 50000 Qi — +120 Qi/sec  
+
+Cost scaling formula:
+cost = baseCost * 1.15^level
+
+REALMS (MAJOR PROGRESSION)
+Realms multiply all gains, but reset Qi upon breakthrough:
+
+Body Tempering — x2  
+Qi Condensation — x3  
+Foundation — x5  
+Core Formation — x10  
+Nascent Soul — x20  
+Sage — x35  
+Immortal — x50  
+
+Player must reach a Qi threshold for each realm. When breaking through, show animation and reset current Qi but keep multipliers.
+
+ACHIEVEMENTS
+Add visible & hidden achievements that permanently boost stats
+(ex: first 1,000 Qi, first 10 upgrades, first breakthrough, etc).
+
+RESEARCH TREE
+Add a research screen with upgrades such as:
+- Qi Efficiency: multiplies all gains
+- Realm Insight: reduces breakthrough costs
+- Automation unlocks
+Research should take time, not only Qi, and feel long-term.
+
+PRESTIGE SYSTEM (ASCENSION)
+Add an Ascension mechanic when players become very strong. Ascension resets MOST progress but awards “Ascension Points”.
+
+Formula suggestion:
+Ascension Points = floor(log10(totalQiEver)) - 4
+
+Ascension Points can be spent on:
+- Global Qi multiplier
+- Faster generators
+- Offline gains
+- Unique permanent perks
+
+DESIGN RULES
+- No hard caps: progression should feel infinite.
+- Avoid dead zones (always give something to work toward).
+- Introduce systems gradually so beginners aren’t overwhelmed.
+- Show satisfying number formatting (K, M, B, T, Qa, Qi, etc).
+
+UI REQUIREMENTS
+- Clean minimalist style
+- Big clickable button for Qi
+- Panels for:
+  - Generators
+  - Realms
+  - Research
+  - Achievements
+  - Ascension (later)
+Use animations that feel smooth but not flashy.
+
+SAVE SYSTEM
+- Auto-save every 3 seconds to localStorage.
+- Add “Export Save” and “Import Save” buttons.
+
+DELIVERABLE
+Generate:
+- Full React project structure
+- Implement all core systems described above
+- Include comments explaining key formulas
+- Provide instructions on how to run locally with npm
+
+Focus first on: click system + generators + realms.
+Then layer achievements, research, and prestige.
+Make it easy to extend later.
+
+If anything is unclear, assume the simplest reasonable solution and proceed.
