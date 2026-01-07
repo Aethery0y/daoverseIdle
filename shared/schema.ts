@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, json, datetime } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,12 +8,7 @@ import { z } from "zod";
 
 export const GeneratorType = z.enum([
   "meditation_mat",
-  "spirit_well",
-  "inner_disciple",
-  "qi_formation",
-  "spirit_vein",
-  "ancient_array",
-  "heavenly_sect"
+  "spirit_well"
 ]);
 
 export const RealmType = z.enum([
@@ -34,7 +29,7 @@ export const GameStateSchema = z.object({
     totalQi: z.number(), // Lifetime qi, used for prestige/achievements
     ascensionPoints: z.number().default(0),
   }),
-  generators: z.record(GeneratorType, z.number()), // Count of each generator
+  generators: z.record(z.string(), z.number()), // Count of each generator
   realm: z.object({
     name: RealmType,
     multiplier: z.number(),
@@ -52,17 +47,20 @@ export type GameState = z.infer<typeof GameStateSchema>;
 
 // === TABLE DEFINITIONS ===
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const users = mysqlTable("users", {
+  id: int("id").primaryKey().autoincrement(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  avatar: varchar("avatar", { length: 10000 }).default(""), // Base64 image data
+  theme: varchar("theme", { length: 10 }).default("dark"), // 'dark' or 'light'
+  createdAt: datetime("created_at").notNull().default(new Date()),
 });
 
-export const saves = pgTable("saves", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id), // Nullable for anonymous local saves that sync later
-  data: jsonb("data").$type<GameState>().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export const saves = mysqlTable("saves", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull().references(() => users.id),
+  data: json("data").$type<GameState>().notNull(),
+  updatedAt: datetime("updated_at").notNull().default(new Date()),
 });
 
 // === SCHEMAS ===

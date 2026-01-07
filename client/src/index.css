@@ -63,6 +63,36 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  .light-theme {
+    --background: 45 100% 98%;
+    --foreground: 45 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 45 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 45 20% 10%;
+    --primary: 38 92% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 45 20% 90%;
+    --secondary-foreground: 45 20% 10%;
+    --muted: 45 20% 95%;
+    --muted-foreground: 45 10% 40%;
+    --accent: 38 100% 95%;
+    --accent-foreground: 38 92% 30%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 45 20% 85%;
+    --input: 45 20% 85%;
+    --ring: 38 92% 50%;
+    --sidebar-background: 45 50% 97%;
+    --sidebar-foreground: 45 20% 10%;
+    --sidebar-primary: 38 92% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 45 20% 90%;
+    --sidebar-accent-foreground: 45 20% 10%;
+    --sidebar-border: 45 20% 85%;
+    --sidebar-ring: 38 92% 50%;
+  }
 }
 
 @layer base {
@@ -71,5 +101,20 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+  }
+  
+  /* Light theme specific overrides for Qi colors */
+  .light-theme {
+    --qi-50: 45 100% 95%;
+    --qi-100: 43 100% 90%;
+    --qi-200: 42 100% 80%;
+    --qi-300: 40 100% 70%;
+    --qi-400: 38 100% 60%;
+    --qi-500: 38 92% 50%;
+    --qi-600: 36 85% 45%;
+    --qi-700: 34 80% 40%;
+    --qi-800: 32 75% 35%;
+    --qi-900: 30 70% 25%;
+    --qi-950: 28 65% 15%;
   }
 }

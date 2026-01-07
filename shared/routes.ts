@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { insertUserSchema, insertSaveSchema, GameStateSchema } from './schema';
+import { insertUserSchema, insertSaveSchema, GameStateSchema, type InsertUser } from './schema';
+
+export type { InsertUser };
 
 // ============================================
 // API CONTRACT

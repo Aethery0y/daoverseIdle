@@ -10,11 +10,6 @@ const INITIAL_STATE: GameState = {
   generators: {
     [GeneratorType.enum.meditation_mat]: 0,
     [GeneratorType.enum.spirit_well]: 0,
-    [GeneratorType.enum.inner_disciple]: 0,
-    [GeneratorType.enum.qi_formation]: 0,
-    [GeneratorType.enum.spirit_vein]: 0,
-    [GeneratorType.enum.ancient_array]: 0,
-    [GeneratorType.enum.heavenly_sect]: 0,
   },
   realm: { name: RealmType.enum.body_tempering, multiplier: 1 },
   faction: null,
@@ -27,100 +22,158 @@ const INITIAL_STATE: GameState = {
 export function useGameLoop() {
   const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
   const [isInitialized, setIsInitialized] = useState(false);
-  const { remoteSave, saveGame } = useGameSave();
+  const { remoteSave, saveGame, saveGameAsync } = useGameSave();
   const { toast } = useToast();
-  
+
+  // Ref to track the last successfully saved state for comparison
+  const lastSavedStateRef = useRef<GameState | null>(null);
+
   // Refs for loop to access latest state without dependency cycles
   const stateRef = useRef(gameState);
   useEffect(() => { stateRef.current = gameState; }, [gameState]);
 
   // Load from local storage or remote on mount
   useEffect(() => {
-    const local = localStorage.getItem("cultivation_save");
-    if (local) {
+    const localStr = localStorage.getItem("cultivation_save");
+    let localSave: GameState | null = null;
+
+    if (localStr) {
       try {
-        const parsed = JSON.parse(local);
-        // Simple merge/validation could go here
-        setGameState({ ...INITIAL_STATE, ...parsed });
+        localSave = JSON.parse(localStr);
       } catch (e) {
         console.error("Failed to parse local save", e);
       }
-    } else if (remoteSave) {
-      setGameState(remoteSave);
     }
-    setIsInitialized(true);
-  }, [remoteSave]);
 
-  // Auto-save loop (every 5s)
+    // Helper to sanitize state (remove invalid generators)
+    const sanitizeState = (state: GameState): GameState => {
+      const validGenerators = Object.values(GeneratorType.enum);
+      const cleanGenerators: Record<string, number> = {};
+
+      // Keep only valid generators
+      validGenerators.forEach(type => {
+        // @ts-ignore - Indexing with string is fine here
+        cleanGenerators[type] = state.generators[type] || 0;
+      });
+
+      return {
+        ...state,
+        generators: cleanGenerators
+      };
+    };
+
+    if (remoteSave && localSave) {
+      // Compare timestamps
+      if (remoteSave.lastSaveTime > localSave.lastSaveTime) {
+        // Cloud is newer
+        console.log("Loading from Cloud (Newer)");
+        const clean = sanitizeState(remoteSave);
+        setGameState(clean);
+        lastSavedStateRef.current = clean;
+        localStorage.setItem("cultivation_save", JSON.stringify(clean));
+      } else {
+        // Local is newer or equal
+        console.log("Loading from Local (Newer/Equal)");
+        const clean = sanitizeState(localSave);
+        setGameState(clean);
+        lastSavedStateRef.current = clean; // Assume it will be synced shortly
+        // Sync to cloud since we have newer local data
+        saveGame(clean);
+      }
+    } else if (remoteSave) {
+      console.log("Loading from Cloud (Only source)");
+      const clean = sanitizeState(remoteSave);
+      setGameState(clean);
+      lastSavedStateRef.current = clean;
+      localStorage.setItem("cultivation_save", JSON.stringify(clean));
+    } else if (localSave) {
+      console.log("Loading from Local (Only source)");
+      const clean = sanitizeState(localSave);
+      setGameState(clean);
+      lastSavedStateRef.current = clean;
+    }
+
+    setIsInitialized(true);
+  }, [remoteSave, saveGame]);
+
+  // Reactive Save Effect: Immediately save on major changes
+  useEffect(() => {
+    if (!isInitialized || !lastSavedStateRef.current) return;
+
+    const current = gameState;
+    const last = lastSavedStateRef.current;
+
+    // Check for critical changes: Generators, Realm, Faction, or Settings
+    // We use JSON.stringify for deep comparison of specific sections
+    const generatorsChanged = JSON.stringify(current.generators) !== JSON.stringify(last.generators);
+    const realmChanged = current.realm.name !== last.realm.name;
+    const factionChanged = current.faction !== last.faction;
+    const settingsChanged = JSON.stringify(current.settings) !== JSON.stringify(last.settings);
+
+    if (generatorsChanged || realmChanged || factionChanged || settingsChanged) {
+      console.log("Critical state change detected - Saving immediately");
+      const toSave = { ...current, lastSaveTime: Date.now() };
+      saveGame(toSave);
+      lastSavedStateRef.current = toSave;
+    }
+  }, [gameState, isInitialized, saveGame]);
+
+  // Auto-save loop (Local + Periodic Qi Cloud Save)
   useEffect(() => {
     if (!isInitialized) return;
-    const interval = setInterval(() => {
+
+    // Local save every 5 seconds (Safety net)
+    const localInterval = setInterval(() => {
       const current = stateRef.current;
       const toSave = { ...current, lastSaveTime: Date.now() };
       localStorage.setItem("cultivation_save", JSON.stringify(toSave));
-      
-      // Also sync to cloud occasionally (maybe logic here to throttle cloud syncs)
-      // saveGame(toSave); 
     }, 5000);
-    return () => clearInterval(interval);
-  }, [isInitialized]);
+
+    // Cloud save every 60 seconds (For Qi mainly)
+    const cloudInterval = setInterval(() => {
+      const current = stateRef.current;
+      const toSave = { ...current, lastSaveTime: Date.now() };
+      saveGame(toSave);
+      lastSavedStateRef.current = toSave;
+      console.log("Periodic cloud save (Qi)");
+    }, 60000);
+
+    return () => {
+      clearInterval(localInterval);
+      clearInterval(cloudInterval);
+    };
+  }, [isInitialized, saveGame]);
 
   // Cloud sync trigger (manual or on important events)
-  const syncToCloud = useCallback(() => {
-    saveGame(stateRef.current);
-    toast({ title: "Progress Saved", description: "Your cultivation progress has been recorded in the heavenly archives." });
-  }, [saveGame, toast]);
-
-  // Core Game Loop (Passive Generation)
-  useEffect(() => {
-    if (!isInitialized) return;
-    const interval = setInterval(() => {
-      setGameState(prev => {
-        let passivePerSec = 0;
-        
-        // Calculate passive from generators
-        Object.entries(prev.generators).forEach(([type, count]) => {
-          const data = GENERATOR_DATA[type];
-          passivePerSec += count * data.baseProduction;
-        });
-
-        // Apply Realm Multiplier
-        passivePerSec *= prev.realm.multiplier;
-
-        // Apply Faction Multiplier (Righteous = +10%)
-        if (prev.faction === FactionType.enum.righteous) {
-          passivePerSec *= 1.1;
-        }
-
-        const productionTick = passivePerSec / 10; // Running at 100ms ticks
-
-        if (productionTick > 0) {
-          return {
-            ...prev,
-            resources: {
-              ...prev.resources,
-              qi: prev.resources.qi + productionTick,
-              totalQi: prev.resources.totalQi + productionTick,
-            }
-          };
-        }
-        return prev;
-      });
-    }, 100); // 10 ticks per second
-
-    return () => clearInterval(interval);
-  }, [isInitialized]);
+  const syncToCloud = useCallback(async () => {
+    try {
+      const toSave = { ...stateRef.current, lastSaveTime: Date.now() };
+      await saveGameAsync(toSave);
+      lastSavedStateRef.current = toSave;
+      toast({ title: "Progress Saved", description: "Your cultivation progress has been recorded in the heavenly archives." });
+    } catch (e) {
+      toast({ title: "Save Failed", description: "Could not reach the archives.", variant: "destructive" });
+    }
+  }, [saveGameAsync, toast]);
 
   // Actions
   const clickCultivate = useCallback(() => {
     setGameState(prev => {
       let clickPower = 1;
-      
+
+      // Add generator bonuses to click power
+      Object.entries(prev.generators).forEach(([type, count]) => {
+        const data = GENERATOR_DATA[type];
+        if (data) {
+          clickPower += count * data.clickPowerBonus;
+        }
+      });
+
       // Realm Multiplier
       clickPower *= prev.realm.multiplier;
-      
-      // Faction Multiplier (Demonic = +10%)
-      if (prev.faction === FactionType.enum.demonic) {
+
+      // Faction Multipliers (Both Righteous and Demonic = +10%)
+      if (prev.faction === FactionType.enum.demonic || prev.faction === FactionType.enum.righteous) {
         clickPower *= 1.1;
       }
 
@@ -137,7 +190,7 @@ export function useGameLoop() {
 
   const purchaseGenerator = useCallback((type: string) => {
     setGameState(prev => {
-      const count = prev.generators[type as keyof typeof prev.generators];
+      const count = prev.generators[type as keyof typeof prev.generators] ?? 0;
       const data = GENERATOR_DATA[type];
       const cost = Math.floor(data.baseCost * Math.pow(1.15, count));
 
@@ -162,7 +215,7 @@ export function useGameLoop() {
       if (!nextRealmKey) return prev; // Max level
 
       const nextRealm = REALM_DATA[nextRealmKey];
-      
+
       // Cost reduction (Heavenly = -10%)
       let cost = nextRealm.requiredQi;
       if (prev.faction === FactionType.enum.heavenly) {
@@ -175,7 +228,7 @@ export function useGameLoop() {
           description: `You have advanced to the ${nextRealm.label} realm! Multiplier increased to x${nextRealm.multiplier}.`,
           className: "bg-primary text-primary-foreground border-none"
         });
-        
+
         return {
           ...prev,
           resources: { ...prev.resources, qi: 0 }, // Reset current Qi

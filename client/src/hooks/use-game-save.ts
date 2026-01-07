@@ -16,7 +16,7 @@ export function useGameSave() {
       return api.saves.get.responses[200].parse(await res.json());
     },
     // Don't refetch automatically, we control state locally mostly
-    staleTime: Infinity, 
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 
@@ -40,6 +40,7 @@ export function useGameSave() {
     remoteSave: loadSaveQuery.data,
     isLoading: loadSaveQuery.isLoading,
     saveGame: saveMutation.mutate,
+    saveGameAsync: saveMutation.mutateAsync,
     isSaving: saveMutation.isPending,
   };
 }

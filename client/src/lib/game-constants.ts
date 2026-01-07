@@ -10,18 +10,13 @@ export const REALM_DATA: Record<string, { label: string, multiplier: number, req
   [RealmType.enum.immortal]: { label: "Immortal", multiplier: 100000, requiredQi: 100000000000, description: "Transcending the cycle of reincarnation." },
 };
 
-export const GENERATOR_DATA: Record<string, { label: string, baseProduction: number, baseCost: number, description: string }> = {
-  [GeneratorType.enum.meditation_mat]: { label: "Meditation Mat", baseProduction: 1, baseCost: 15, description: "A simple mat to aid focus." },
-  [GeneratorType.enum.spirit_well]: { label: "Spirit Well", baseProduction: 8, baseCost: 100, description: "Draws ambient qi from the earth." },
-  [GeneratorType.enum.inner_disciple]: { label: "Inner Disciple", baseProduction: 40, baseCost: 1100, description: "A loyal follower who gathers qi for you." },
-  [GeneratorType.enum.qi_formation]: { label: "Qi Formation", baseProduction: 150, baseCost: 12000, description: "An array that naturally gathers energy." },
-  [GeneratorType.enum.spirit_vein]: { label: "Spirit Vein", baseProduction: 800, baseCost: 130000, description: "Direct tap into the earth's meridians." },
-  [GeneratorType.enum.ancient_array]: { label: "Ancient Array", baseProduction: 5000, baseCost: 1400000, description: "Lost technology of the old gods." },
-  [GeneratorType.enum.heavenly_sect]: { label: "Heavenly Sect", baseProduction: 30000, baseCost: 20000000, description: "An entire sect dedicated to your glory." },
+export const GENERATOR_DATA: Record<string, { label: string, clickPowerBonus: number, baseCost: number, description: string }> = {
+  [GeneratorType.enum.meditation_mat]: { label: "Meditation Mat", clickPowerBonus: 1, baseCost: 15, description: "A simple mat to aid focus." },
+  [GeneratorType.enum.spirit_well]: { label: "Spirit Well", clickPowerBonus: 8, baseCost: 100, description: "Draws ambient qi from the earth." },
 };
 
 export const FACTION_DATA: Record<string, { label: string, description: string, color: string }> = {
-  [FactionType.enum.righteous]: { label: "Righteous Sect", description: "+10% Passive Qi Generation", color: "text-blue-400" },
+  [FactionType.enum.righteous]: { label: "Righteous Sect", description: "+10% Click Power", color: "text-blue-400" },
   [FactionType.enum.demonic]: { label: "Demonic Path", description: "+10% Click Power", color: "text-red-500" },
   [FactionType.enum.heavenly]: { label: "Heavenly Dao", description: "-10% Realm Breakthrough Cost", color: "text-amber-400" },
 };
