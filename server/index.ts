@@ -122,10 +122,10 @@ app.use((req, res, next) => {
   httpServer.listen(
     {
       port,
-      host: "localhost",
+      host: "0.0.0.0",
     },
     () => {
-      log(`serving on port ${port}`);
+      log(`serving on 0.0.0.0:${port}`);
     },
   );
 })();
