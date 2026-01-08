@@ -7,7 +7,7 @@ import { AuthDialog } from "@/components/AuthDialog";
 import { AuthModal } from "@/components/AuthModal";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scroll, Info, Settings, Trophy, AlertTriangle, Sparkles } from "lucide-react";
+import { Scroll, Settings, Trophy, AlertTriangle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 
@@ -59,7 +59,7 @@ export default function Home() {
           >
             <span className="h-2 w-2 rounded-full bg-celestial-jade animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
           </Button>
-          <AuthDialog onLogout={syncToCloud} />
+          <AuthDialog onLogout={syncToCloud} gameState={gameState} />
         </div>
       </div>
 
@@ -82,51 +82,11 @@ export default function Home() {
             <GeneratorList state={gameState} onBuy={purchaseGenerator} />
           </TabsContent>
 
-          <TabsContent value="info" className="h-full m-0 p-6 pb-32 overflow-auto">
-            <h2 className="font-display text-2xl mb-6 bg-gradient-to-r from-qi-200 to-qi-400 bg-clip-text text-transparent">
-              Cultivation Path
-            </h2>
-            <div className="space-y-4 max-w-2xl mx-auto">
-              <Card className="p-6 bg-gradient-to-br from-qi-900/40 to-qi-800/20 border-qi-500/30">
-                <h3 className="font-display text-xl text-qi-300 mb-4 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  Current Dao
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                    <span className="text-muted-foreground">Faction</span>
-                    <span className="capitalize font-bold text-qi-300">{gameState.faction?.replace('_', ' ')}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                    <span className="text-muted-foreground">Current Realm</span>
-                    <span className="font-bold text-qi-300">{gameState.realm.name.replace('_', ' ')}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                    <span className="text-muted-foreground">Realm Multiplier</span>
-                    <span className="font-mono font-bold text-celestial-gold">×{gameState.realm.multiplier}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                    <span className="text-muted-foreground">Total Lifetime Qi</span>
-                    <span className="font-mono font-bold text-qi-400">{Math.floor(gameState.resources.totalQi).toLocaleString()}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 bg-gradient-to-br from-qi-900/40 to-qi-800/20 border-qi-500/30">
-                <h3 className="font-display text-xl text-qi-300 mb-4">About Cultivation</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Click the cultivation circle to gather Qi energy. Purchase spiritual assets to boost your click power.
-                  Breakthrough to higher realms for powerful multipliers. Choose your faction wisely, as it will shape your journey through the immortal realms.
-                </p>
-              </Card>
-            </div>
-          </TabsContent>
-
         </div>
 
-        {/* Bottom Tab Navigation */}
-        <div className="border-t border-qi-500/20 bg-gradient-to-t from-background/95 to-background/80 backdrop-blur-md">
-          <TabsList className="w-full h-16 grid grid-cols-3 bg-transparent rounded-none border-0 p-0">
+        {/* Bottom Navigation */}
+        <div className="flex-none bg-background/80 backdrop-blur-md border-t border-qi-500/20 pb-safe">
+          <TabsList className="w-full h-16 grid grid-cols-2 bg-transparent rounded-none border-0 p-0">
             <TabsTrigger
               value="cultivate"
               className="h-full flex flex-col gap-1 data-[state=active]:bg-qi-600/20 data-[state=active]:text-qi-300 data-[state=active]:border-t-2 data-[state=active]:border-qi-500 rounded-none"
@@ -140,13 +100,6 @@ export default function Home() {
             >
               <Scroll className="w-5 h-5" />
               <span className="text-xs font-medium">Assets</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="info"
-              className="h-full flex flex-col gap-1 data-[state=active]:bg-qi-600/20 data-[state=active]:text-qi-300 data-[state=active]:border-t-2 data-[state=active]:border-qi-500 rounded-none"
-            >
-              <Info className="w-5 h-5" />
-              <span className="text-xs font-medium">Info</span>
             </TabsTrigger>
           </TabsList>
         </div>

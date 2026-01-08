@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Palette, LogOut, Upload, Moon, Sun, Sparkles, Lock, Trash2, AlertTriangle, Settings } from "lucide-react";
+import { User, Palette, LogOut, Upload, Moon, Sun, Sparkles, Lock, Trash2, AlertTriangle, Settings, Trophy, Zap, Globe } from "lucide-react";
+import { GameState } from "@shared/schema";
+import { formatNumber } from "@/lib/game-constants";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
@@ -13,9 +15,10 @@ interface ProfilePanelProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onLogout?: () => Promise<void>;
+    gameState: GameState;
 }
 
-export function ProfilePanel({ open, onOpenChange, onLogout }: ProfilePanelProps) {
+export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: ProfilePanelProps) {
     const { user, logout } = useAuth();
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [avatar, setAvatar] = useState<string>('');
@@ -138,6 +141,10 @@ export function ProfilePanel({ open, onOpenChange, onLogout }: ProfilePanelProps
             const data = await res.json();
 
             if (res.ok) {
+                // Clear local storage to prevent zombie data
+                localStorage.removeItem('cultivation_save');
+                localStorage.removeItem('userAvatar');
+                localStorage.removeItem('theme');
                 // Account deleted, redirect to login
                 window.location.reload();
             } else {
@@ -225,6 +232,47 @@ export function ProfilePanel({ open, onOpenChange, onLogout }: ProfilePanelProps
                             <div className="text-center">
                                 <h3 className="text-xl font-display text-qi-300">{user.username}</h3>
                                 <p className="text-sm text-muted-foreground">Cultivator ID: #{user.id}</p>
+                            </div>
+                        </div>
+
+                        {/* Player Stats */}
+                        <div className="space-y-3">
+                            <h4 className="font-display text-sm text-qi-400 uppercase tracking-widest mb-2 border-b border-qi-500/20 pb-1">Current Dao</h4>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-muted/30 p-3 rounded-lg border border-qi-500/10">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                                        <Globe className="w-3 h-3" /> World
+                                    </div>
+                                    <div className="font-display text-qi-300 capitalize text-sm">{gameState.realm.world}</div>
+                                </div>
+                                <div className="bg-muted/30 p-3 rounded-lg border border-qi-500/10">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                                        <Trophy className="w-3 h-3" /> Realm
+                                    </div>
+                                    <div className="font-display text-qi-300 capitalize text-sm">
+                                        {gameState.realm.name}
+                                        <span className="text-xs text-muted-foreground ml-1 block">Stage {gameState.realm.stage}</span>
+                                    </div>
+                                </div>
+                                <div className="bg-muted/30 p-3 rounded-lg border border-qi-500/10">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                                        <Zap className="w-3 h-3" /> Multiplier
+                                    </div>
+                                    <div className="font-mono text-celestial-gold">x{gameState.realm.multiplier}</div>
+                                </div>
+                                <div className="bg-muted/30 p-3 rounded-lg border border-qi-500/10">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                                        <Sparkles className="w-3 h-3" /> Faction
+                                    </div>
+                                    <div className="font-display text-qi-300 capitalize">{gameState.faction || "None"}</div>
+                                </div>
+                                <div className="bg-muted/30 p-3 rounded-lg border border-qi-500/10 col-span-2">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                                        <Settings className="w-3 h-3" /> Lifetime Qi
+                                    </div>
+                                    <div className="font-mono text-qi-300">{formatNumber(gameState.resources.totalQi)}</div>
+                                </div>
                             </div>
                         </div>
 

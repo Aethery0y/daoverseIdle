@@ -1,17 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { GameState, GeneratorType, RealmType, FactionType } from "@shared/schema";
-import { REALM_DATA, GENERATOR_DATA } from "@/lib/game-constants";
+import { GameState, GeneratorType, FactionType } from "@shared/schema";
+import { REALMS, GENERATOR_DATA, calculateMultiplier, calculateRequiredQi, getRealm, getNextRealm } from "@/lib/game-constants";
 import { useGameSave } from "./use-game-save";
 import { useToast } from "@/hooks/use-toast";
 
 // Initial state constant
+// Now using ID-based realm structure
 const INITIAL_STATE: GameState = {
   resources: { qi: 0, totalQi: 0, ascensionPoints: 0 },
   generators: {
     [GeneratorType.enum.meditation_mat]: 0,
     [GeneratorType.enum.spirit_well]: 0,
   },
-  realm: { name: RealmType.enum.body_tempering, multiplier: 1 },
+  realm: {
+    id: 1,
+    stage: 1,
+    name: "Qi Refinement",
+    world: "Mortal World",
+    multiplier: 1
+  },
   faction: null,
   upgrades: [],
   achievements: [],
@@ -25,21 +32,27 @@ export function useGameLoop() {
   const { remoteSave, saveGame, saveGameAsync } = useGameSave();
   const { toast } = useToast();
 
-  // Ref to track the last successfully saved state for comparison
   const lastSavedStateRef = useRef<GameState | null>(null);
-
-  // Refs for loop to access latest state without dependency cycles
   const stateRef = useRef(gameState);
+
+  // Sync ref with state
   useEffect(() => { stateRef.current = gameState; }, [gameState]);
 
-  // Load from local storage or remote on mount
+  // Load logic with migration handling
   useEffect(() => {
     const localStr = localStorage.getItem("cultivation_save");
     let localSave: GameState | null = null;
 
     if (localStr) {
       try {
-        localSave = JSON.parse(localStr);
+        const parsed = JSON.parse(localStr);
+        // Check for legacy realm data (string vs object with id)
+        if (typeof parsed.realm?.name === 'string' && !parsed.realm?.id) {
+          console.log("Legacy save detected - Resetting to new system");
+          localSave = null; // Force reset or migration
+        } else {
+          localSave = parsed;
+        }
       } catch (e) {
         console.error("Failed to parse local save", e);
       }
@@ -47,66 +60,77 @@ export function useGameLoop() {
 
     // Helper to sanitize state (remove invalid generators)
     const sanitizeState = (state: GameState): GameState => {
+      // Basic structure check
+      if (!state.realm || !state.realm.id) {
+        return { ...INITIAL_STATE, settings: state.settings || INITIAL_STATE.settings };
+      }
+
       const validGenerators = Object.values(GeneratorType.enum);
       const cleanGenerators: Record<string, number> = {};
 
-      // Keep only valid generators
       validGenerators.forEach(type => {
-        // @ts-ignore - Indexing with string is fine here
+        // @ts-ignore
         cleanGenerators[type] = state.generators[type] || 0;
       });
 
+      // Recalculate multiplier just in case
+      const currentMultiplier = calculateMultiplier(
+        state.realm.id,
+        state.realm.stage,
+        getRealm(state.realm.id)?.worldIndex || 0
+      );
+
       return {
         ...state,
-        generators: cleanGenerators
+        generators: cleanGenerators,
+        realm: {
+          ...state.realm,
+          multiplier: currentMultiplier
+        }
       };
     };
 
-    if (remoteSave && localSave) {
-      // Compare timestamps
-      if (remoteSave.lastSaveTime > localSave.lastSaveTime) {
-        // Cloud is newer
-        console.log("Loading from Cloud (Newer)");
-        const clean = sanitizeState(remoteSave);
-        setGameState(clean);
-        lastSavedStateRef.current = clean;
-        localStorage.setItem("cultivation_save", JSON.stringify(clean));
-      } else {
-        // Local is newer or equal
-        console.log("Loading from Local (Newer/Equal)");
-        const clean = sanitizeState(localSave);
-        setGameState(clean);
-        lastSavedStateRef.current = clean; // Assume it will be synced shortly
-        // Sync to cloud since we have newer local data
-        saveGame(clean);
-      }
-    } else if (remoteSave) {
-      console.log("Loading from Cloud (Only source)");
-      const clean = sanitizeState(remoteSave);
+    const processLoad = (targetState: GameState, source: string) => {
+      console.log(`Loading from ${source}`);
+      const clean = sanitizeState(targetState);
       setGameState(clean);
       lastSavedStateRef.current = clean;
       localStorage.setItem("cultivation_save", JSON.stringify(clean));
+    };
+
+    if (remoteSave && localSave) {
+      if (remoteSave.lastSaveTime > localSave.lastSaveTime) {
+        processLoad(remoteSave, "Cloud (Newer)");
+      } else {
+        console.log("Loading from Local (Newer/Equal)");
+        const clean = sanitizeState(localSave);
+        setGameState(clean);
+        lastSavedStateRef.current = clean;
+        saveGame(clean); // Sync local to cloud
+      }
+    } else if (remoteSave) {
+      processLoad(remoteSave, "Cloud (Only source)");
     } else if (localSave) {
-      console.log("Loading from Local (Only source)");
-      const clean = sanitizeState(localSave);
-      setGameState(clean);
-      lastSavedStateRef.current = clean;
+      processLoad(localSave, "Local (Only source)");
+    } else {
+      // No save found, initialize fresh
+      console.log("No save found - Initializing fresh");
+      setIsInitialized(true);
+      lastSavedStateRef.current = INITIAL_STATE;
     }
 
     setIsInitialized(true);
   }, [remoteSave, saveGame]);
 
-  // Reactive Save Effect: Immediately save on major changes
+  // Reactive Save Effect
   useEffect(() => {
     if (!isInitialized || !lastSavedStateRef.current) return;
 
     const current = gameState;
     const last = lastSavedStateRef.current;
 
-    // Check for critical changes: Generators, Realm, Faction, or Settings
-    // We use JSON.stringify for deep comparison of specific sections
     const generatorsChanged = JSON.stringify(current.generators) !== JSON.stringify(last.generators);
-    const realmChanged = current.realm.name !== last.realm.name;
+    const realmChanged = current.realm.id !== last.realm.id || current.realm.stage !== last.realm.stage;
     const factionChanged = current.faction !== last.faction;
     const settingsChanged = JSON.stringify(current.settings) !== JSON.stringify(last.settings);
 
@@ -118,18 +142,16 @@ export function useGameLoop() {
     }
   }, [gameState, isInitialized, saveGame]);
 
-  // Auto-save loop (Local + Periodic Qi Cloud Save)
+  // Auto-save loop
   useEffect(() => {
     if (!isInitialized) return;
 
-    // Local save every 5 seconds (Safety net)
     const localInterval = setInterval(() => {
       const current = stateRef.current;
       const toSave = { ...current, lastSaveTime: Date.now() };
       localStorage.setItem("cultivation_save", JSON.stringify(toSave));
     }, 5000);
 
-    // Cloud save every 60 seconds (For Qi mainly)
     const cloudInterval = setInterval(() => {
       const current = stateRef.current;
       const toSave = { ...current, lastSaveTime: Date.now() };
@@ -144,24 +166,22 @@ export function useGameLoop() {
     };
   }, [isInitialized, saveGame]);
 
-  // Cloud sync trigger (manual or on important events)
+  // Actions
   const syncToCloud = useCallback(async () => {
     try {
       const toSave = { ...stateRef.current, lastSaveTime: Date.now() };
       await saveGameAsync(toSave);
       lastSavedStateRef.current = toSave;
-      toast({ title: "Progress Saved", description: "Your cultivation progress has been recorded in the heavenly archives." });
+      toast({ title: "Progress Saved", description: "Your cultivation progress has been recorded." });
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not reach the archives.", variant: "destructive" });
     }
   }, [saveGameAsync, toast]);
 
-  // Actions
   const clickCultivate = useCallback(() => {
     setGameState(prev => {
       let clickPower = 1;
 
-      // Add generator bonuses to click power
       Object.entries(prev.generators).forEach(([type, count]) => {
         const data = GENERATOR_DATA[type];
         if (data) {
@@ -169,10 +189,8 @@ export function useGameLoop() {
         }
       });
 
-      // Realm Multiplier
       clickPower *= prev.realm.multiplier;
 
-      // Faction Multipliers (Both Righteous and Demonic = +10%)
       if (prev.faction === FactionType.enum.demonic || prev.faction === FactionType.enum.righteous) {
         clickPower *= 1.1;
       }
@@ -207,34 +225,63 @@ export function useGameLoop() {
 
   const breakthrough = useCallback(() => {
     setGameState(prev => {
-      const currentRealmKey = prev.realm.name;
-      const realms = Object.keys(REALM_DATA);
-      const currentIndex = realms.indexOf(currentRealmKey);
-      const nextRealmKey = realms[currentIndex + 1];
+      const realmId = prev.realm.id;
+      const currentRealmData = getRealm(realmId);
 
-      if (!nextRealmKey) return prev; // Max level
+      if (!currentRealmData) return prev;
 
-      const nextRealm = REALM_DATA[nextRealmKey];
+      // Required Qi Calculation
+      let requiredQi = calculateRequiredQi(realmId, prev.realm.stage);
 
-      // Cost reduction (Heavenly = -10%)
-      let cost = nextRealm.requiredQi;
+      // Discount
       if (prev.faction === FactionType.enum.heavenly) {
-        cost *= 0.9;
+        requiredQi *= 0.9;
       }
 
-      if (prev.resources.qi >= cost) {
+      if (prev.resources.qi >= requiredQi) {
+        // Checks for progression
+        let nextStage = prev.realm.stage + 1;
+        let nextRealmId = realmId;
+
+        // Major Breakthrough Check
+        if (nextStage > currentRealmData.stages) {
+          nextRealmId++;
+          nextStage = 1;
+        }
+
+        const nextRealmData = getRealm(nextRealmId);
+        if (!nextRealmData) {
+          toast({ title: "Max Level Reached", description: "You have reached the apex of this universe." });
+          return prev;
+        }
+
+        // Consume Qi
+        const remainingQi = prev.resources.qi - requiredQi;
+
+        // New Multiplier
+        const newMultiplier = calculateMultiplier(nextRealmId, nextStage, nextRealmData.worldIndex);
+
+        const isMajor = nextRealmId > realmId;
         toast({
-          title: "Breakthrough Successful!",
-          description: `You have advanced to the ${nextRealm.label} realm! Multiplier increased to x${nextRealm.multiplier}.`,
+          title: isMajor ? "Major Breakthrough!" : "Minor Breakthrough",
+          description: `You have advanced to ${nextRealmData.name} ${isMajor ? "" : `Stage ${nextStage}`}! Multiplier: x${newMultiplier}`,
           className: "bg-primary text-primary-foreground border-none"
         });
 
         return {
           ...prev,
-          resources: { ...prev.resources, qi: 0 }, // Reset current Qi
-          realm: { name: nextRealmKey as any, multiplier: nextRealm.multiplier }
+          resources: { ...prev.resources, qi: remainingQi },
+          realm: {
+            id: nextRealmData.id,
+            stage: nextStage,
+            name: nextRealmData.name,
+            world: nextRealmData.world,
+            multiplier: newMultiplier
+          }
         };
       }
+
+      toast({ title: "Insufficient Qi", description: "Your foundation is not yet stable enough.", variant: "destructive" });
       return prev;
     });
   }, [toast]);
@@ -245,7 +292,7 @@ export function useGameLoop() {
 
   const hardReset = useCallback(() => {
     if (confirm("Are you sure you want to cripple your cultivation and start over?")) {
-      setGameState({ ...INITIAL_STATE, faction: null }); // Reset to null faction to trigger selection
+      setGameState({ ...INITIAL_STATE, faction: null });
       localStorage.removeItem("cultivation_save");
     }
   }, []);

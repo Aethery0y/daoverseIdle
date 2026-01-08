@@ -6,8 +6,9 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { User, ChevronDown } from "lucide-react";
 import { ProfilePanel } from "@/components/ProfilePanel";
+import { GameState } from "@shared/schema";
 
-export function AuthDialog({ onLogout }: { onLogout?: () => Promise<void> }) {
+export function AuthDialog({ onLogout, gameState }: { onLogout?: () => Promise<void>, gameState: GameState }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
@@ -47,7 +48,7 @@ export function AuthDialog({ onLogout }: { onLogout?: () => Promise<void> }) {
           <ChevronDown className="w-4 h-4 text-qi-400 group-hover:text-qi-300 transition-colors" />
         </button>
 
-        <ProfilePanel open={profileOpen} onOpenChange={setProfileOpen} onLogout={onLogout} />
+        <ProfilePanel open={profileOpen} onOpenChange={setProfileOpen} onLogout={onLogout} gameState={gameState} />
       </>
     );
   }

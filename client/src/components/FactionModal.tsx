@@ -45,7 +45,7 @@ export function FactionModal({ open, onSelect }: FactionModalProps) {
   return (
     <Dialog open={open} onOpenChange={() => { }}>
       <DialogContent
-        className="sm:max-w-4xl bg-gradient-to-b from-background via-qi-950/30 to-background border-qi-500/30 backdrop-blur-xl"
+        className="sm:max-w-4xl max-h-[85vh] overflow-y-auto bg-gradient-to-b from-background via-qi-950/30 to-background border-qi-500/30 backdrop-blur-xl"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="text-center space-y-4 pb-6">

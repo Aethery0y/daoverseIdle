@@ -11,15 +11,9 @@ export const GeneratorType = z.enum([
   "spirit_well"
 ]);
 
-export const RealmType = z.enum([
-  "body_tempering",
-  "qi_condensation",
-  "foundation",
-  "core_formation",
-  "nascent_soul",
-  "sage",
-  "immortal"
-]);
+// Realm ID is now a number from 1-34
+// We don't use an enum for IDs to allow easier numeric progression
+export const RealmIdSchema = z.number().min(1).max(34);
 
 export const FactionType = z.enum(["demonic", "righteous", "heavenly"]);
 
@@ -31,7 +25,10 @@ export const GameStateSchema = z.object({
   }),
   generators: z.record(z.string(), z.number()), // Count of each generator
   realm: z.object({
-    name: RealmType,
+    id: RealmIdSchema,
+    stage: z.number().min(1).max(9), // Current stage (1-9 typically)
+    name: z.string(), // Cached name for display
+    world: z.string(), // Cached world name because calculating it purely from ID on frontend is annoying if logic changes
     multiplier: z.number(),
   }),
   faction: FactionType.nullable(),
