@@ -114,7 +114,7 @@ export function calculateRequiredQi(realmId: number, stage: number): number {
   // Mortal realms start slow (100)
   // Higher realms explode
 
-  const base = 10000;
+  const base = 100000;
   // Growth factor per "Total Step"
   // Total Steps = Cumulative stages passed
 
@@ -153,5 +153,5 @@ export function formatNumber(num: number): string {
 }
 
 export function calculateCost(baseCost: number, count: number): number {
-  return Math.floor(baseCost * Math.pow(1.15, count));
+  return Math.floor(baseCost * Math.pow(1.2, count));
 }

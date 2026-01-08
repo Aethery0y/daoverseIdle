@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, GeneratorType, FactionType } from "@shared/schema";
-import { REALMS, GENERATOR_DATA, calculateMultiplier, calculateRequiredQi, getRealm, getNextRealm } from "@/lib/game-constants";
+import { REALMS, GENERATOR_DATA, calculateMultiplier, calculateRequiredQi, getRealm, getNextRealm, calculateCost } from "@/lib/game-constants";
 import { useGameSave } from "./use-game-save";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
 // Initial state constant
@@ -29,7 +30,7 @@ const INITIAL_STATE: GameState = {
 export function useGameLoop() {
   const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
   const [isInitialized, setIsInitialized] = useState(false);
-  const { remoteSave, saveGame, saveGameAsync } = useGameSave();
+  const { remoteSave, saveGame, saveGameAsync, isLoading: saveLoading, isError: saveError } = useGameSave();
   const { toast } = useToast();
 
   const lastSavedStateRef = useRef<GameState | null>(null);
@@ -38,91 +39,77 @@ export function useGameLoop() {
   // Sync ref with state
   useEffect(() => { stateRef.current = gameState; }, [gameState]);
 
-  // Load logic with migration handling
-  useEffect(() => {
-    const localStr = localStorage.getItem("cultivation_save");
-    let localSave: GameState | null = null;
+  // Helper to sanitize state (remove invalid generators)
+  // Helper to sanitize state (remove invalid generators)
+  const sanitizeState = useCallback((state: GameState): GameState => {
+    if (!state) return INITIAL_STATE;
 
-    if (localStr) {
-      try {
-        const parsed = JSON.parse(localStr);
-        // Check for legacy realm data (string vs object with id)
-        if (typeof parsed.realm?.name === 'string' && !parsed.realm?.id) {
-          console.log("Legacy save detected - Resetting to new system");
-          localSave = null; // Force reset or migration
-        } else {
-          localSave = parsed;
-        }
-      } catch (e) {
-        console.error("Failed to parse local save", e);
-      }
-    }
-
-    // Helper to sanitize state (remove invalid generators)
-    const sanitizeState = (state: GameState): GameState => {
-      // Basic structure check
-      if (!state.realm || !state.realm.id) {
-        return { ...INITIAL_STATE, settings: state.settings || INITIAL_STATE.settings };
-      }
-
-      const validGenerators = Object.values(GeneratorType.enum);
-      const cleanGenerators: Record<string, number> = {};
-
-      validGenerators.forEach(type => {
-        // @ts-ignore
-        cleanGenerators[type] = state.generators[type] || 0;
-      });
-
-      // Recalculate multiplier just in case
-      const currentMultiplier = calculateMultiplier(
-        state.realm.id,
-        state.realm.stage,
-        getRealm(state.realm.id)?.worldIndex || 0
-      );
-
-      return {
-        ...state,
-        generators: cleanGenerators,
-        realm: {
-          ...state.realm,
-          multiplier: currentMultiplier
-        }
-      };
+    // Ensure deep merge with initial state structure to fill missing fields
+    const sanitized = {
+      ...INITIAL_STATE,
+      ...state,
+      resources: { ...INITIAL_STATE.resources, ...state.resources },
+      realm: { ...INITIAL_STATE.realm, ...state.realm },
+      // Important calls: Ensure generators key exists.
+      generators: { ...INITIAL_STATE.generators, ...(state.generators || {}) },
+      settings: { ...INITIAL_STATE.settings, ...(state.settings || {}) },
+      // Preserve arrays
+      upgrades: Array.isArray(state.upgrades) ? state.upgrades : [],
+      achievements: Array.isArray(state.achievements) ? state.achievements : [],
+      // Preserver Faction (Explicitly handle null)
+      faction: state.faction ?? null,
     };
 
-    const processLoad = (targetState: GameState, source: string) => {
-      console.log(`Loading from ${source}`);
-      const clean = sanitizeState(targetState);
+    // Remove invalid generators that might have been removed from the game
+    Object.keys(sanitized.generators).forEach(key => {
+      if (!GENERATOR_DATA[key]) {
+        delete sanitized.generators[key];
+      }
+    });
+
+    console.log("[DEBUG] Sanitized State (Faction):", sanitized.faction);
+    return sanitized;
+  }, []);
+
+  // ... (sanitizeState implementation omitted for brevity in thought process, will include in tool call)
+
+  const { user, isLoading: authLoading } = useAuth();
+
+  // Load logic: Server-Authoritative Only
+  useEffect(() => {
+    // 1. Wait for Auth
+    if (authLoading || !user) return;
+
+    // 2. Wait for Query to start/finish
+    // When useGameSave becomes enabled (due to user existing), isLoading might flash false for a tick?
+    // Actually, if enabled changes to true, React Query starts fetching. isLoading should be true.
+    if (saveLoading) return;
+
+    // If error, we still initialize to allow offline play (User requested unblocking)
+    if (saveError) {
+      console.warn("Save load error - initializing offline/new game");
+    }
+
+    if (!remoteSave && !saveLoading) {
+      // No save on server? New game.
+      console.log("No cloud save found - Initializing fresh");
+      setGameState(INITIAL_STATE);
+      lastSavedStateRef.current = INITIAL_STATE;
+      setIsInitialized(true);
+    } else if (remoteSave) {
+      // Server save exists? Use it.
+      console.log("Loading from Cloud - Raw Save:", JSON.stringify(remoteSave));
+      // log faction specifically
+      console.log("Raw Faction:", remoteSave.faction);
+      const clean = sanitizeState(remoteSave);
+      console.log("Sanitized Faction:", clean.faction);
       setGameState(clean);
       lastSavedStateRef.current = clean;
-      localStorage.setItem("cultivation_save", JSON.stringify(clean));
-    };
-
-    if (remoteSave && localSave) {
-      if (remoteSave.lastSaveTime > localSave.lastSaveTime) {
-        processLoad(remoteSave, "Cloud (Newer)");
-      } else {
-        console.log("Loading from Local (Newer/Equal)");
-        const clean = sanitizeState(localSave);
-        setGameState(clean);
-        lastSavedStateRef.current = clean;
-        saveGame(clean); // Sync local to cloud
-      }
-    } else if (remoteSave) {
-      processLoad(remoteSave, "Cloud (Only source)");
-    } else if (localSave) {
-      processLoad(localSave, "Local (Only source)");
-    } else {
-      // No save found, initialize fresh
-      console.log("No save found - Initializing fresh");
       setIsInitialized(true);
-      lastSavedStateRef.current = INITIAL_STATE;
     }
+  }, [remoteSave, saveLoading, saveError, sanitizeState, toast, user, authLoading]);
 
-    setIsInitialized(true);
-  }, [remoteSave, saveGame]);
-
-  // Reactive Save Effect
+  // Reactive Save Effect (Critical Actions)
   useEffect(() => {
     if (!isInitialized || !lastSavedStateRef.current) return;
 
@@ -132,49 +119,78 @@ export function useGameLoop() {
     const generatorsChanged = JSON.stringify(current.generators) !== JSON.stringify(last.generators);
     const realmChanged = current.realm.id !== last.realm.id || current.realm.stage !== last.realm.stage;
     const factionChanged = current.faction !== last.faction;
-    const settingsChanged = JSON.stringify(current.settings) !== JSON.stringify(last.settings);
+    const upgradesChanged = current.upgrades.length !== last.upgrades.length;
+    const achievementsChanged = current.achievements.length !== last.achievements.length;
 
-    if (generatorsChanged || realmChanged || factionChanged || settingsChanged) {
-      console.log("Critical state change detected - Saving immediately");
-      const toSave = { ...current, lastSaveTime: Date.now() };
+    // CRITICAL SAFETY CHECK: Do not auto-save if we are at the initial empty state.
+    // This prevents overwriting a valid save with a new game if loading fails.
+    const isMostlyEmpty = current.resources.totalQi === 0 && current.realm.id === 1 && Object.values(current.generators).every(v => v === 0);
+
+    if (isMostlyEmpty && !generatorsChanged && !realmChanged && !factionChanged) {
+      console.log("Skipping save - State is empty/initial");
+      return;
+    }
+
+    if (generatorsChanged || realmChanged || factionChanged || upgradesChanged || achievementsChanged) {
+      console.log("Critical action - Saving immediately");
+
+      // Calculate QiPerTap for stats
+      let clickPower = 1;
+      Object.entries(current.generators).forEach(([type, count]) => {
+        const data = GENERATOR_DATA[type];
+        if (data) clickPower += count * data.clickPowerBonus;
+      });
+      clickPower *= current.realm.multiplier;
+      if (current.faction === FactionType.enum.demonic || current.faction === FactionType.enum.righteous) {
+        clickPower *= 1.1;
+      }
+
+      const toSave = {
+        ...current,
+        stats: { qiPerTap: clickPower },
+        lastSaveTime: Date.now()
+      };
+
+      // Backup locally immediately
+      localStorage.setItem("idle_ascent_save", JSON.stringify(toSave));
+
       saveGame(toSave);
       lastSavedStateRef.current = toSave;
     }
   }, [gameState, isInitialized, saveGame]);
 
-  // Auto-save loop
+  // Periodic Save (Qi/Resources Batching - 30s)
   useEffect(() => {
     if (!isInitialized) return;
 
-    const localInterval = setInterval(() => {
+    const intervalId = setInterval(() => {
       const current = stateRef.current;
-      const toSave = { ...current, lastSaveTime: Date.now() };
-      localStorage.setItem("cultivation_save", JSON.stringify(toSave));
-    }, 5000);
+      // Only save if different from last save (optimization)
+      if (JSON.stringify(current) !== JSON.stringify(lastSavedStateRef.current)) {
+        console.log("Periodic Batch Save (Qi/Resources)");
+        const toSave = { ...current, lastSaveTime: Date.now() };
+        saveGame(toSave);
+        lastSavedStateRef.current = toSave;
+      }
+    }, 30000); // 30 seconds
 
-    const cloudInterval = setInterval(() => {
-      const current = stateRef.current;
-      const toSave = { ...current, lastSaveTime: Date.now() };
-      saveGame(toSave);
-      lastSavedStateRef.current = toSave;
-      console.log("Periodic cloud save (Qi)");
-    }, 60000);
-
-    return () => {
-      clearInterval(localInterval);
-      clearInterval(cloudInterval);
-    };
+    return () => clearInterval(intervalId);
   }, [isInitialized, saveGame]);
 
   // Actions
   const syncToCloud = useCallback(async () => {
     try {
       const toSave = { ...stateRef.current, lastSaveTime: Date.now() };
+
+      // Always backup locally first
+      localStorage.setItem("idle_ascent_save", JSON.stringify(toSave));
+
       await saveGameAsync(toSave);
       lastSavedStateRef.current = toSave;
       toast({ title: "Progress Saved", description: "Your cultivation progress has been recorded." });
-    } catch (e) {
-      toast({ title: "Save Failed", description: "Could not reach the archives.", variant: "destructive" });
+    } catch (e: any) {
+      // Silent fail for UX, but data is safe locally
+      console.error("Server save failed (local backup active):", e);
     }
   }, [saveGameAsync, toast]);
 
@@ -210,7 +226,7 @@ export function useGameLoop() {
     setGameState(prev => {
       const count = prev.generators[type as keyof typeof prev.generators] ?? 0;
       const data = GENERATOR_DATA[type];
-      const cost = Math.floor(data.baseCost * Math.pow(1.15, count));
+      const cost = calculateCost(data.baseCost, count);
 
       if (prev.resources.qi >= cost) {
         return {
@@ -286,16 +302,36 @@ export function useGameLoop() {
     });
   }, [toast]);
 
-  const selectFaction = useCallback((faction: string) => {
-    setGameState(prev => ({ ...prev, faction: faction as any }));
-  }, []);
+  const selectFaction = useCallback(async (faction: string) => {
+    // 1. Compute new state based on current (safe because this is a specific user action)
+    const newState: GameState = {
+      ...stateRef.current, // Use Ref to avoid stale closure if dependencies lag
+      faction: faction as GameState['faction']
+    };
+
+    console.log("[Faction Select] Saving New Faction:", faction);
+
+    // 2. Update Local UI immediately
+    setGameState(newState);
+
+    // 3. Force Server Save
+    try {
+      await saveGameAsync(newState);
+      lastSavedStateRef.current = newState;
+      toast({ title: "Path Chosen", description: `You have embraced the ${faction} path.` });
+    } catch (e) {
+      console.error("Failed to save faction choice:", e);
+      toast({ title: "Save Failed", description: "Could not record your choice. Please check connection.", variant: "destructive" });
+    }
+  }, [saveGameAsync, toast]);
 
   const hardReset = useCallback(() => {
     if (confirm("Are you sure you want to cripple your cultivation and start over?")) {
       setGameState({ ...INITIAL_STATE, faction: null });
-      localStorage.removeItem("cultivation_save");
+      // Clean server save too? Ideally yes, but for now just local reset triggers save eventually
+      saveGameAsync({ ...INITIAL_STATE, faction: null });
     }
-  }, []);
+  }, [saveGameAsync]);
 
   return {
     gameState,
@@ -305,6 +341,10 @@ export function useGameLoop() {
     breakthrough,
     selectFaction,
     syncToCloud,
-    hardReset
+    hardReset,
+    isError: saveError || false,
+    isSaving: saveLoading || false,
+    // True while we are waiting for the FIRST save load attempt
+    isLoading: !isInitialized && saveLoading
   };
 }

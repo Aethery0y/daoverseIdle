@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { api, type GameStateSchema } from "@shared/routes";
 import { z } from "zod";
 import { GameState } from "@shared/schema";
@@ -18,6 +19,7 @@ export function useGameSave() {
     // Don't refetch automatically, we control state locally mostly
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+    enabled: !!useAuth().user, // Only fetch if logged in
   });
 
   const saveMutation = useMutation({
@@ -28,6 +30,13 @@ export function useGameSave() {
         body: JSON.stringify(data),
         credentials: "include",
       });
+
+      if (res.status === 401) {
+        // Session expired (server restart?), force reload to login
+        window.location.reload();
+        throw new Error("Session expired");
+      }
+
       if (!res.ok) throw new Error("Failed to sync save");
       return api.saves.sync.responses[200].parse(await res.json());
     },
@@ -39,6 +48,8 @@ export function useGameSave() {
   return {
     remoteSave: loadSaveQuery.data,
     isLoading: loadSaveQuery.isLoading,
+    isError: loadSaveQuery.isError, // Expose error state
+    error: loadSaveQuery.error,
     saveGame: saveMutation.mutate,
     saveGameAsync: saveMutation.mutateAsync,
     isSaving: saveMutation.isPending,

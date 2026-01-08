@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { GameState, GeneratorType } from "@shared/schema";
-import { formatNumber, GENERATOR_DATA } from "@/lib/game-constants";
+import { formatNumber, GENERATOR_DATA, calculateCost } from "@/lib/game-constants";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -11,9 +11,7 @@ interface GeneratorListProps {
   onBuy: (type: string) => void;
 }
 
-const calculateCost = (baseCost: number, owned: number) => {
-  return Math.floor(baseCost * Math.pow(1.15, owned));
-};
+// Local calculateCost removed to use imported one from game-constants
 
 // Icon mapping for generators
 const generatorIcons: Record<string, string> = {

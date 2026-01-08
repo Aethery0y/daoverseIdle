@@ -15,19 +15,18 @@ export function AuthDialog({ onLogout, gameState }: { onLogout?: () => Promise<v
   const [password, setPassword] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const { login, register, isPending, user } = useAuth();
+  const { login, register, user } = useAuth();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const action = isRegister ? register : login;
-
-    action({ username, password }, {
-      onSuccess: () => setIsOpen(false)
-    });
+    action({ username, password });
+    setIsOpen(false);
   };
 
   if (user) {
-    const avatar = localStorage.getItem('userAvatar');
+    // Rely on user state, not localStorage, to prevent cross-account bleeding
+    const avatar = user.avatar;
 
     return (
       <>
@@ -95,8 +94,8 @@ export function AuthDialog({ onLogout, gameState }: { onLogout?: () => Promise<v
           </div>
 
           <div className="flex flex-col gap-2 pt-2">
-            <Button type="submit" disabled={isPending} className="w-full font-bold">
-              {isPending ? "Connecting..." : (isRegister ? "Begin Journey" : "Access Archives")}
+            <Button type="submit" disabled={false} className="w-full font-bold">
+              {isRegister ? "Begin Journey" : "Access Archives"}
             </Button>
 
             <button

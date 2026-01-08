@@ -1,21 +1,42 @@
+import { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api, type InsertUser } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
 
-export function useAuth() {
+type User = {
+  id: number;
+  username: string;
+  avatar?: string;
+  theme?: string;
+};
+
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  error: Error | null;
+  login: (data: InsertUser) => void;
+  register: (data: InsertUser) => void;
+  logout: () => void;
+  setUser: (user: User | null) => void;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const [user, setUser] = useState<{ id: number, username: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("/api/users/me");
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data);
+        const res = await fetch("/api/users/me");
+        if (res.ok) {
+          const user = await res.json();
+          setUser(user);
+        } else {
+          setUser(null);
         }
       } catch (err) {
         console.error("Auth check failed:", err);
@@ -36,17 +57,18 @@ export function useAuth() {
       });
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Invalid credentials");
+        throw new Error(error.message || "Login failed");
       }
       return api.users.login.responses[200].parse(await res.json());
     },
-    onSuccess: (data) => {
-      setUser(data);
-      toast({ title: "Welcome back, Daoist " + data.username });
+    onSuccess: (user: User) => {
+      setUser(user);
+      toast({ title: "Welcome back, Daoist " + user.username });
     },
-    onError: (err) => {
+    onError: (err: Error) => {
+      setError(err);
       toast({ title: "Login failed", description: err.message, variant: "destructive" });
-    }
+    },
   });
 
   const registerMutation = useMutation({
@@ -62,35 +84,49 @@ export function useAuth() {
       }
       return api.users.register.responses[201].parse(await res.json());
     },
-    onSuccess: (data) => {
-      setUser(data);
-      toast({ title: "Welcome to the path, Daoist " + data.username });
+    onSuccess: (user: User) => {
+      setUser(user);
+      toast({ title: "Welcome to the path, Daoist " + user.username });
     },
-    onError: (err) => {
+    onError: (err: Error) => {
+      setError(err);
       toast({ title: "Registration failed", description: err.message, variant: "destructive" });
-    }
+    },
   });
 
   const logout = async () => {
     try {
       await fetch("/api/users/logout", { method: "POST" });
-      setUser(null);
-      toast({ title: "Logged out successfully" });
-      // Reload to clear any cached state
-      window.location.reload();
     } catch (err) {
-      toast({ title: "Logout failed", variant: "destructive" });
+      console.error("Logout request failed, forcing local cleanup", err);
+    } finally {
+      setUser(null);
+      toast({ title: "Logged out" });
+      window.location.reload();
     }
   };
 
-  return {
+  const contextValue = {
     user,
     isLoading,
-    isAuthenticated: !!user,
+    error,
     login: loginMutation.mutate,
     register: registerMutation.mutate,
     logout,
-    isPending: loginMutation.isPending || registerMutation.isPending,
-    setUser,
+    setUser
   };
+
+  return (
+    <AuthContext.Provider value={contextValue} >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
 }

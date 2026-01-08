@@ -19,9 +19,11 @@ interface ProfilePanelProps {
 }
 
 export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: ProfilePanelProps) {
-    const { user, logout } = useAuth();
+    const { user, logout, setUser } = useAuth();
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [avatar, setAvatar] = useState<string>('');
+    const [username, setUsername] = useState('');
+    const [newUsername, setNewUsername] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [deletePassword, setDeletePassword] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -40,6 +42,10 @@ export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: Profil
                         setTheme(data.theme);
                         document.documentElement.classList.toggle('light-theme', data.theme === 'light');
                     }
+                    if (user.username) {
+                        setUsername(user.username);
+                        setNewUsername(user.username);
+                    }
                 })
                 .catch(() => {
                     // Fallback to localStorage
@@ -53,28 +59,71 @@ export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: Profil
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const avatarData = reader.result as string;
-                setAvatar(avatarData);
+        if (!file) return;
 
-                // Save to database
-                try {
-                    await fetch('/api/users/preferences', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ avatar: avatarData })
-                    });
-                    localStorage.setItem('userAvatar', avatarData);
-                    setMessage({ type: 'success', text: 'Avatar updated!' });
-                    setTimeout(() => setMessage(null), 3000);
-                } catch (err) {
-                    setMessage({ type: 'error', text: 'Failed to save avatar' });
-                }
-            };
-            reader.readAsDataURL(file);
+        // 1. Check file size (4MB limit)
+        if (file.size > 4 * 1024 * 1024) {
+            setMessage({ type: 'error', text: 'Image is more than 4MB, please choose a smaller image.' });
+            return;
+        }
+
+        // 2. Resize/Compress Image
+        const resizeImage = (file: File): Promise<string> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    const MAX_WIDTH = 512;
+                    const MAX_HEIGHT = 512;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext("2d");
+                    ctx?.drawImage(img, 0, 0, width, height);
+
+                    // Compress to JPEG at 0.7 quality
+                    const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                    resolve(dataUrl);
+                };
+                img.onerror = reject;
+            });
+        };
+
+        try {
+            setMessage({ type: 'success', text: 'Processing image...' });
+            const avatarData = await resizeImage(file);
+
+            setAvatar(avatarData);
+
+            // Save to database
+            await fetch('/api/users/preferences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ avatar: avatarData })
+            });
+            localStorage.setItem('userAvatar', avatarData);
+            setUser({ ...user!, avatar: avatarData }); // Update context
+            setMessage({ type: 'success', text: 'Avatar updated!' });
+            setTimeout(() => setMessage(null), 3000);
+        } catch (err) {
+            console.error(err);
+            setMessage({ type: 'error', text: 'Failed to process or save avatar' });
         }
     };
 
@@ -91,8 +140,37 @@ export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: Profil
                 body: JSON.stringify({ theme: newTheme })
             });
             localStorage.setItem('theme', newTheme);
+            setUser({ ...user!, theme: newTheme }); // Update context
         } catch (err) {
             console.error('Failed to save theme');
+        }
+    };
+
+    const handleUsernameUpdate = async () => {
+        if (!newUsername || newUsername.length < 3) {
+            setMessage({ type: 'error', text: 'Username too short' });
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/users/preferences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ username: newUsername })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || 'Failed');
+            }
+
+            setUsername(newUsername);
+            setUser({ ...user!, username: newUsername });
+            setMessage({ type: 'success', text: 'Username updated!' });
+            setTimeout(() => setMessage(null), 3000);
+        } catch (err: any) {
+            setMessage({ type: 'error', text: err.message || 'Failed to update username' });
         }
     };
 
@@ -157,14 +235,23 @@ export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: Profil
         }
     };
 
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
     const handleLogout = async () => {
+        setIsLoggingOut(true);
         if (onLogout) {
             try {
+                // 1. Save
                 await onLogout();
+                // 2. Wait for user to see "Saved" toast (UX Delay)
+                await new Promise(resolve => setTimeout(resolve, 800));
             } catch (e) {
                 console.error("Save before logout failed", e);
+                // Even if save fails, we should probably still logout if they clicked the button?
+                // Or maybe warn them? For now, proceed to logout but maybe after a shorter delay.
             }
         }
+        // 3. Logout (which reloads)
         logout();
     };
 
@@ -280,10 +367,20 @@ export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: Profil
                         <Button
                             onClick={handleLogout}
                             variant="destructive"
-                            className="w-full"
+                            className="w-full relative transition-all duration-300"
+                            disabled={isLoggingOut}
                         >
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Save & Logout
+                            {isLoggingOut ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                                    Saving Progress...
+                                </>
+                            ) : (
+                                <>
+                                    <LogOut className="w-4 h-4 mr-2" />
+                                    Save & Logout
+                                </>
+                            )}
                         </Button>
                     </TabsContent>
 
@@ -337,6 +434,30 @@ export function ProfilePanel({ open, onOpenChange, onLogout, gameState }: Profil
                                     )}
                                 </div>
                             </Card>
+                        </div>
+
+                        {/* Username Update */}
+                        <div className="space-y-3 pt-4 border-t border-qi-500/20">
+                            <Label className="text-qi-300 font-display flex items-center gap-2">
+                                <User className="w-4 h-4" />
+                                Identity
+                            </Label>
+
+                            <div className="space-y-2">
+                                <Label>Username</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        value={newUsername}
+                                        onChange={(e) => setNewUsername(e.target.value)}
+                                        placeholder="New username"
+                                        className="bg-muted/30 border-qi-500/20"
+                                    />
+                                    <Button onClick={handleUsernameUpdate} variant="outline" className="border-qi-500/50 hover:bg-qi-500/10">
+                                        Update
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">This is how other cultivators will know you.</p>
+                            </div>
                         </div>
 
                         {/* Change Password */}
