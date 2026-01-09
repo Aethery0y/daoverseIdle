@@ -113,22 +113,22 @@ export function CultivationPanel({ state, onClick, onBreakthrough }: Cultivation
         </div>
 
         {/* Main Qi Display */}
-        <div className="text-center mb-6 md:mb-10 flex-shrink-0 w-full">
+        <div className="text-center mb-4 md:mb-10 flex-shrink-0 w-full">
           <motion.h1
-            className="text-5xl sm:text-6xl md:text-7xl font-mono font-bold bg-gradient-to-b from-qi-200 via-qi-400 to-qi-600 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(168,85,247,0.5)]"
+            className="text-4xl sm:text-6xl md:text-7xl font-mono font-bold bg-gradient-to-b from-qi-200 via-qi-400 to-qi-600 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(168,85,247,0.5)]"
             animate={{ scale: [1, 1.02, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
             <NumberFlow value={state.resources.qi} />
           </motion.h1>
-          <div className="flex items-center justify-center gap-2 mt-3 text-qi-300 font-mono text-sm shadow-sm backdrop-blur-sm bg-background/20 rounded-full px-4 py-1 border border-qi-500/20 inline-flex">
-            <Sparkles className="w-4 h-4 animate-pulse" />
+          <div className="flex items-center justify-center gap-2 mt-2 md:mt-3 text-qi-300 font-mono text-xs md:text-sm shadow-sm backdrop-blur-sm bg-background/20 rounded-full px-4 py-1 border border-qi-500/20 inline-flex">
+            <Sparkles className="w-3 h-3 md:w-4 md:h-4 animate-pulse" />
             <span className="font-semibold">{formatNumber(clickPower)} Qi / tap</span>
           </div>
         </div>
 
-        {/* Cultivation Circle/Mandala */}
-        <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 flex items-center justify-center mb-6 md:mb-10 flex-shrink-0">
+        {/* Cultivation Circle/Mandala - Made smaller for mobile */}
+        <div className="relative w-56 h-56 sm:w-72 sm:h-72 md:w-80 md:h-80 flex items-center justify-center mb-6 md:mb-10 flex-shrink-0">
           {/* Rotating Outer Ring */}
           <div className="absolute inset-0 rounded-full border-2 border-qi-500/30 animate-rotate-slow" />
           <div className="absolute inset-4 rounded-full border border-qi-400/20 animate-rotate-slow" style={{ animationDirection: "reverse" }} />
@@ -139,7 +139,7 @@ export function CultivationPanel({ state, onClick, onBreakthrough }: Cultivation
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleClick}
-            className="relative w-52 h-52 sm:w-60 sm:h-60 md:w-64 md:h-64 rounded-full cursor-pointer group"
+            className="relative w-44 h-44 sm:w-60 sm:h-60 md:w-64 md:h-64 rounded-full cursor-pointer group"
           >
             {/* Glow Effect */}
             <div className="absolute inset-0 rounded-full bg-gradient-radial from-qi-500/40 via-qi-600/20 to-transparent blur-xl group-hover:from-qi-400/60 transition-all duration-300" />
@@ -151,7 +151,7 @@ export function CultivationPanel({ state, onClick, onBreakthrough }: Cultivation
 
             {/* Center Text */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl sm:text-3xl font-display text-qi-300 group-hover:text-qi-200 tracking-widest transition-all duration-300 drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]">
+              <span className="text-xl sm:text-3xl font-display text-qi-300 group-hover:text-qi-200 tracking-widest transition-all duration-300 drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]">
                 CULTIVATE
               </span>
             </div>

@@ -86,11 +86,11 @@ export function GeneratorList({ state, onBuy }: GeneratorListProps) {
               {/* Shimmer effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer pointer-events-none" style={{ backgroundSize: "200% 100%" }} />
 
-              <div className="relative p-4">
-                <div className="flex items-start gap-4">
+              <div className="relative p-3 sm:p-4">
+                <div className="flex items-start gap-3 sm:gap-4">
                   {/* Icon */}
                   <div className={cn(
-                    "w-16 h-16 rounded-lg flex items-center justify-center text-3xl transition-all duration-300 shrink-0",
+                    "w-12 h-12 sm:w-16 sm:h-16 rounded-lg flex items-center justify-center text-2xl sm:text-3xl transition-all duration-300 shrink-0",
                     canAfford && !isMaxed
                       ? "bg-gradient-to-br from-qi-600/40 to-qi-700/40 shadow-lg shadow-qi-500/30"
                       : "bg-gradient-to-br from-qi-800/30 to-qi-900/30"
@@ -100,24 +100,24 @@ export function GeneratorList({ state, onBuy }: GeneratorListProps) {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2 mb-2">
                       <div>
                         <h3 className={cn(
-                          "font-display text-lg font-semibold tracking-wide",
+                          "font-display text-base sm:text-lg font-semibold tracking-wide truncate",
                           canAfford && !isMaxed ? "text-qi-200" : "text-qi-300/80"
                         )}>
                           {data.label}
                         </h3>
                         {count > 0 && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="text-xs text-qi-400 font-mono">Owned: {count}</span>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[10px] sm:text-xs text-qi-400 font-mono">Owned: {count}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Cost Badge */}
                       <div className={cn(
-                        "px-3 py-1 rounded-full text-xs font-mono font-semibold whitespace-nowrap",
+                        "self-start px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-mono font-semibold whitespace-nowrap",
                         canAfford && !isMaxed
                           ? "bg-qi-500/30 text-qi-200 border border-qi-400/50"
                           : "bg-muted/30 text-muted-foreground border border-muted/30"
@@ -127,21 +127,21 @@ export function GeneratorList({ state, onBuy }: GeneratorListProps) {
                     </div>
 
                     {/* Description */}
-                    <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mb-3 line-clamp-1">
                       {data.description}
                     </p>
 
                     {/* Stats and Button */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 text-xs">
-                        <div className="flex items-center gap-1.5 text-qi-400 font-mono">
-                          <Zap className="w-3.5 h-3.5" />
-                          <span className="font-semibold">+{formatNumber(productionPerTap)}/tap</span>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs">
+                        <div className="flex items-center gap-1 text-qi-400 font-mono">
+                          <Zap className="w-3 h-3" />
+                          <span className="font-semibold">+{formatNumber(productionPerTap)}</span>
                         </div>
                         {count > 0 && (
-                          <div className="flex items-center gap-1.5 text-celestial-jade font-mono">
-                            <TrendingUp className="w-3.5 h-3.5" />
-                            <span className="font-semibold">{formatNumber(productionPerTap * count)}/tap total</span>
+                          <div className="flex items-center gap-1 text-celestial-jade font-mono">
+                            <TrendingUp className="w-3 h-3" />
+                            <span className="font-semibold">{formatNumber(productionPerTap * count)} total</span>
                           </div>
                         )}
                       </div>
@@ -151,7 +151,7 @@ export function GeneratorList({ state, onBuy }: GeneratorListProps) {
                         disabled={!canAfford || isMaxed}
                         size="sm"
                         className={cn(
-                          "font-semibold transition-all duration-300",
+                          "w-full sm:w-auto h-8 text-xs font-semibold transition-all duration-300",
                           canAfford && !isMaxed
                             ? "bg-gradient-to-r from-qi-600 to-qi-500 hover:from-qi-500 hover:to-qi-400 text-white shadow-lg shadow-qi-500/40 border border-qi-400/50"
                             : "bg-muted/50 text-muted-foreground hover:bg-muted/70",
@@ -160,7 +160,7 @@ export function GeneratorList({ state, onBuy }: GeneratorListProps) {
                       >
                         {isMaxed ? (
                           <>
-                            <Sparkles className="w-3.5 h-3.5 mr-1" />
+                            <Sparkles className="w-3 h-3 mr-1" />
                             Mastered
                           </>
                         ) : count > 0 ? (
