@@ -32,9 +32,19 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: "50mb" }));
 
+// CRITICAL: Trust Nginx proxy headers (X-Forwarded-Proto)
+// This ensures 'secure: true' cookies work behind a reverse proxy (HTTPS -> HTTP)
+app.set("trust proxy", 1);
+
+import MemoryStore from "memorystore";
+const SessionStore = MemoryStore(session);
+
 // Session middleware
 app.use(
   session({
+    store: new SessionStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    }),
     secret: process.env.SESSION_SECRET || "cultivation-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
@@ -42,6 +52,7 @@ app.use(
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      sameSite: process.env.NODE_ENV === "production" ? 'lax' : undefined // 'none' requires secure, 'lax' is safer
     },
   })
 );
