@@ -85,9 +85,12 @@ export function useGameLoop() {
     // Actually, if enabled changes to true, React Query starts fetching. isLoading should be true.
     if (saveLoading) return;
 
-    // If error, we still initialize to allow offline play (User requested unblocking)
+    // CRITICAL CHANGE: If error, WE DO NOT INITIALIZE. 
+    // User requested to stay on loading screen until data is loaded.
+    // This prevents "Connection Failed" screen and data overwrites.
     if (saveError) {
-      console.warn("Save load error - initializing offline/new game");
+      console.log("Save load error - waiting for retry...");
+      return;
     }
 
     if (!remoteSave && !saveLoading) {

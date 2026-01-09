@@ -92,6 +92,31 @@ export default function Home() {
             Log Out
           </Button>
         </div>
+        <div className="mt-4">
+          <button
+            onClick={() => {
+              // Force allow playing by treating it as a new game
+              // We must accept that this MIGHT overwrite cloud save if connection restores and we save
+              // But if totalQi is 0, we have nothing to lose usually?
+              // actually, if we have a cloud save of 1M Qi, and we fail to load it, 
+              // and we start new (0 Qi), and then SAVE -> we overwrite 1M with 0.
+              // This is DANGEROUS.
+              // BETTER: Allow "Try to Play Anyway" but DISABLE saving until successful load?
+              // For now, let's just make sure 404 doesn't trigger this.
+            }}
+            className="text-xs text-muted-foreground hover:text-primary underline"
+          >
+
+          </button>
+          {/* 
+                DECISION: I will NOT add an "Ignore" button because it risks data loss.
+                The fix in use-game-save.ts (handling 401) and ensuring 404 returns null should fix the False Positives.
+                However, I will make the "Retry" button clearer and maybe debug info.
+             */}
+          <div className="text-[10px] text-red-500/50 font-mono mt-4">
+            Error Code: {isError ? "SYNC_FAIL" : "UNKNOWN"}
+          </div>
+        </div>
       </div>
     );
   }
@@ -101,22 +126,22 @@ export default function Home() {
     <div className="h-screen w-screen bg-black/95 flex flex-col items-center justify-center relative overflow-hidden">
       {/* Background Ambient Effect */}
       <div className="absolute inset-0 bg-gradient-to-b from-qi-900/20 to-black pointer-events-none" />
-      
+
       {/* Loading Icon */}
       <div className="relative mb-8">
         <div className="w-16 h-16 rounded-full border-4 border-qi-500/30 border-t-qi-400 animate-spin" />
         <div className="absolute inset-0 flex items-center justify-center">
-            <span className="h-2 w-2 bg-qi-200 rounded-full animate-pulse shadow-[0_0_10px_#fff]" />
+          <span className="h-2 w-2 bg-qi-200 rounded-full animate-pulse shadow-[0_0_10px_#fff]" />
         </div>
       </div>
 
       {/* Text */}
       <div className="text-center space-y-2 relative z-10">
         <h2 className="text-2xl font-display text-transparent bg-clip-text bg-gradient-to-r from-qi-200 to-qi-500 animate-pulse">
-            Resonating with the Dao...
+          Resonating with the Dao...
         </h2>
         <p className="text-muted-foreground text-xs tracking-widest uppercase opacity-70">
-            Fetching Soul Imprint
+          Fetching Soul Imprint
         </p>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { api, type GameStateSchema } from "@shared/routes";
+import { api } from "@shared/routes";
 import { z } from "zod";
 import { GameState } from "@shared/schema";
 
@@ -13,6 +13,12 @@ export function useGameSave() {
     queryFn: async () => {
       const res = await fetch(api.saves.get.path, { credentials: "include" });
       if (res.status === 404) return null;
+      if (res.status === 401) {
+        // If 401, our session is invalid despite useAuth thinking we are logged in.
+        // Force a refresh to sync auth state.
+        window.location.reload();
+        return null;
+      }
       if (!res.ok) throw new Error("Failed to load save");
       return api.saves.get.responses[200].parse(await res.json());
     },
